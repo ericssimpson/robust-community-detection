@@ -478,3 +478,270 @@ def plot_robin(graph, model1, model2, legend=("model1", "model2"), title="Robin 
 
 #output = robin_robust(graph=graph, graph_random=graph_random, measure="vi", method="louvain", type="independent")
 #plot_robin(graph, output["Mean"], output["MeanRandom"], legend=("real data", "null model"))
+
+
+def robin_compare(graph, 
+                  method1="louvain", 
+                  method2="fastGreedy", 
+                  FUN1=None, 
+                  FUN2=None,
+                  measure="vi", 
+                  type="independent", 
+                  directed=False, 
+                  weights=None, 
+                  steps=4,
+                  spins=25, 
+                  e_weights=None, 
+                  v_weights=None, 
+                  nb_trials=10):
+    method1 = method1.lower()
+    method2 = method2.lower()
+    type = type.lower()
+    measure = measure.lower()
+    nrep = 10
+    N = graph.vcount()
+    comReal1 = membership_communities(graph=graph, method=method1,
+                                      FUN=FUN1,
+                                      directed=directed,
+                                      weights=weights,
+                                      steps=steps,
+                                      spins=spins,
+                                      e_weights=e_weights,
+                                      v_weights=v_weights,
+                                      nb_trials=nb_trials)
+    comReal2 = membership_communities(graph=graph, method=method2,
+                                      FUN=FUN2,
+                                      directed=directed,
+                                      weights=weights,
+                                      steps=steps,
+                                      spins=spins,
+                                      e_weights=e_weights,
+                                      v_weights=v_weights,
+                                      nb_trials=nb_trials)
+
+    de = graph.ecount()
+    Measure = None
+    vector1 = None
+    vector2 = None
+    graphRewire = None
+    count = 1
+    nRewire = np.arange(0, 60, 5)
+
+    # Independent
+    if type == "independent":
+        measureReal1 = np.zeros((nrep**2, len(nRewire)))
+        measureReal2 = np.zeros((nrep**2, len(nRewire)))
+        Mean1 = np.zeros((nrep, len(nRewire)))
+        Mean2 = np.zeros((nrep, len(nRewire)))
+        vet1 = np.arange(5, 65, 5)
+        vet = np.round(vet1 * de / 100, 0)
+
+        for z in vet:
+            count2 = 0
+            count += 1
+            for s in range(nrep):
+                count2 += 1
+                k = 1
+                graphRewire = rewire_onl(data=graph, number=z)
+                comr1 = membership_communities(graph=graphRewire,
+                                               method=method1,
+                                               FUN=FUN1,
+                                               directed=directed,
+                                               weights=weights,
+                                               steps=steps,
+                                               spins=spins,
+                                               e_weights=e_weights,
+                                               v_weights=v_weights,
+                                               nb_trials=nb_trials)
+                comr2 = membership_communities(graph=graphRewire,
+                                               method=method2,
+                                               FUN=FUN2,
+                                               directed=directed,
+                                               weights=weights,
+                                               steps=steps,
+                                               spins=spins,
+                                               e_weights=e_weights,
+                                               v_weights=v_weights,
+                                               nb_trials=nb_trials)
+                if measure == "vi":
+                    vector1[k] = ig.compare_communities(comr1, comReal1,
+                                                        method=measure) / np.log2(N)
+                    vector2[k] = ig.compare_communities(comr2, comReal2,
+                                                        method=measure) / np.log2(N)
+                elif measure == "split.join":
+                    vector1[k] = ig.compare_communities(comr1, comReal1,
+                                                        method=measure) / (2 * N)
+                    vector2[k] = ig.compare_communities(comr2, comReal2,
+                                                        method=measure) / (2 * N)
+                else:
+                    vector1[k] = 1 - ig.compare_communities(comr1, comReal1,
+                                                            method=measure)
+                    vector2[k] = 1 - ig.compare_communities(comr2, comReal2,
+                                                            method=measure)
+                measureReal1[count2, count] = vector1[k]
+                measureReal2[count2, count] = vector2[k]
+
+                for k in range(1, nrep):
+                    count2 += 1
+                    graphRewire = rewire_onl(data=graphRewire,
+                                             number=int(round(0.01 * z)))
+                    comr1 = membership_communities(graph=graphRewire,
+                                                   method=method1,
+                                                   FUN=FUN1,
+                                                   directed=directed,
+                                                   weights=weights,
+                                                   steps=steps,
+                                                   spins=spins,
+                                                   e_weights=e_weights,
+                                                   v_weights=v_weights,
+                                                   nb_trials=nb_trials)
+                    comr2 = membership_communities(graph=graphRewire,
+                                                   method=method2,
+                                                   FUN=FUN2,
+                                                   directed=directed,
+                                                   weights=weights,
+                                                   steps=steps,
+                                                   spins=spins,
+                                                   e_weights=e_weights,
+                                                   v_weights=v_weights,
+                                                   nb_trials=nb_trials)
+                    if measure == "vi":
+                        vector1[k] = ig.compare_communities(comr1, comReal1,
+                                                            method=measure) / np.log2(N)
+                        vector2[k] = ig.compare_communities(comr2, comReal2,
+                                                            method=measure) / np.log2(N)
+                    elif measure == "split.join":
+                        vector1[k] = ig.compare_communities(comr1, comReal1,
+                                                            method=measure) / (2 * N)
+                        vector2[k] = ig.compare_communities(comr2, comReal2,
+                                                            method=measure) / (2 * N)
+                    else:
+                        vector1[k] = 1 - ig.compare_communities(comr1, comReal1,
+                                                                method=measure)
+                        vector2[k] = 1 - ig.compare_communities(comr2, comReal2,
+                                                                method=measure)
+
+                    measureReal1[count2, count] = vector1[k]
+                    measureReal2[count2, count] = vector2[k]
+
+                Mean1[s, count] = np.mean(vector1)
+                Mean2[s, count] = np.mean(vector2)
+
+    # dependent
+    else:
+        z = round((5 * de) / 100, 0)
+        measureReal1 = np.repeat(0, nrep ** 2)
+        measureReal11 = []
+        R11 = []
+        measureReal2 = np.repeat(0, nrep ** 2)
+        measureReal22 = []
+        R22 = []
+        Mean1 = np.repeat(0, nrep)
+        Mean2 = np.repeat(0, nrep)
+        Mean11 = []
+        Mean22 = []
+        diff = None
+        vet = np.repeat(z, (len(nRewire) - 1))
+        for z in vet:
+            count2 = 0
+            count += 1
+            for s in range(nrep):
+                count2 += 1
+                k = 1
+                graphRewire = rewire_onl(data=graph, number=z)
+                graphRewire = ig.Graph.union(graphRewire, diff)
+                comr1 = membership_communities(graph=graphRewire,
+                                               method=method1,
+                                               FUN=FUN1,
+                                               directed=directed,
+                                               weights=weights,
+                                               steps=steps,
+                                               spins=spins,
+                                               e_weights=e_weights,
+                                               v_weights=v_weights,
+                                               nb_trials=nb_trials)
+                comr2 = membership_communities(graph=graphRewire,
+                                               method=method2,
+                                               FUN=FUN2,
+                                               directed=directed,
+                                               weights=weights,
+                                               steps=steps,
+                                               spins=spins,
+                                               e_weights=e_weights,
+                                               v_weights=v_weights,
+                                               nb_trials=nb_trials)
+                if measure == "vi":
+                    vector1[k] = ig.compare_communities(comr1, comReal1,
+                                                        method=measure) / np.log2(N)
+                    vector2[k] = ig.compare_communities(comr2, comReal2,
+                                                        method=measure) / np.log2(N)
+                elif measure == "split.join":
+                    vector1[k] = ig.compare_communities(comr1, comReal1,
+                                                        method=measure) / (2 * N)
+                    vector2[k] = ig.compare_communities(comr2, comReal2,
+                                                        method=measure) / (2 * N)
+                else:
+                    vector1[k] = 1 - ig.compare_communities(comr1, comReal1,
+                                                            method=measure)
+                    vector2[k] = 1 - ig.compare_communities(comr2, comReal2,
+                                                            method=measure)
+
+                measureReal11.append(vector1[k])
+                measureReal22.append(vector2[k])
+                diff = ig.Graph.difference(graph, graphRewire)
+
+                for k in range(1, nrep):
+                    count2 += 1
+                    graphRewire = rewire_onl(data=graphRewire,
+                                             number=round(0.01 * z))
+                    comr1 = membership_communities(graph=graphRewire,
+                                                   method=method1,
+                                                   FUN=FUN1,
+                                                   directed=directed,
+                                                   weights=weights,
+                                                   steps=steps,
+                                                   spins=spins,
+                                                   e_weights=e_weights,
+                                                   v_weights=v_weights,
+                                                   nb_trials=nb_trials)
+                    comr2 = membership_communities(graph=graphRewire,
+                                                   method=method2,
+                                                   FUN=FUN2,
+                                                   directed=directed,
+                                                   weights=weights,
+                                                   steps=steps,
+                                                   spins=spins,
+                                                   e_weights=e_weights,
+                                                   v_weights=v_weights,
+                                                   nb_trials=nb_trials)
+                    if measure == "vi":
+                        vector1[k] = ig.compare_communities(comr1, comReal1, method=measure) / np.log2(N)
+                        vector2[k] = ig.compare_communities(comr2, comReal2,
+                                                            method=measure) / np.log2(N)
+                    elif measure == "split.join":
+                        vector1[k] = ig.compare_communities(comr1, comReal1,
+                                                            method=measure) / (2 * N)
+                        vector2[k] = ig.compare_communities(comr2, comReal2,
+                                                            method=measure) / (2 * N)
+                    else:
+                        vector1[k] = 1 - ig.compare_communities(comr1, comReal1,
+                                                                method=measure)
+                        vector2[k] = 1 - ig.compare_communities(comr2, comReal2,
+                                                                method=measure)
+
+                    measureReal11.append(vector1[k])
+                    measureReal22.append(vector2[k])
+
+                Mean11.append(np.mean(measureReal11))
+                Mean22.append(np.mean(measureReal22))
+
+            graph = ig.Graph.intersection(graph, graphRewire)
+            Mean1 = np.column_stack((Mean1, Mean11))
+            Mean2 = np.column_stack((Mean2, Mean22))
+
+    Mean1 = pd.DataFrame(Mean1, columns=nRewire)
+    Mean2 = pd.DataFrame(Mean2, columns=nRewire)
+    output = {'Mean1': Mean1, 'Mean2': Mean2}
+    return output
+
+#test
