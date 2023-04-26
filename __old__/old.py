@@ -69,6 +69,8 @@ def rewire_compl(data, number, community, library="igraph", method="louvain", me
     measure = measure.lower()
 
     graph_data = data.to_networkx()
+    if number > 0:
+        nx.double_edge_swap(graph_data, nswap=number, max_tries=1e75)
     nx.double_edge_swap(graph_data, nswap=number, max_tries=1e75)
     graph_data = ig.Graph.from_networkx(graph_data)
     data = graph_data
@@ -83,7 +85,11 @@ def rewire_compl(data, number, community, library="igraph", method="louvain", me
 
 def rewire_onl(graph, trials):
     graph_data = graph.to_networkx()
-    nx.double_edge_swap(graph_data, nswap=trials, max_tries=1e75)
+    if trials > 0:
+        try:
+            nx.double_edge_swap(graph_data, nswap=trials, max_tries=1e75)
+        except Exception:
+            print(trials)
     graph_data = ig.Graph.from_networkx(graph_data)
     graph = graph_data
     return graph
@@ -145,7 +151,7 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
 
                 #? RANDOM
                 random = rewire_compl(data=graph_random,
-                                    number=z,
+                                    number=0,
                                     community=com_random,
                                     method=method,
                                     measure=measure, **kwargs)
@@ -174,7 +180,7 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
                         vector[k] = 1 - (real["Measure"])
                     measure_real[count2 - 1, count - 1] = vector[k]
                     random = rewire_compl(data=graph_rewire_random,
-                                            number=round(0.01 * de),
+                                            number=0,
                                             community=com_random,
                                             method=method,
                                             measure=measure, **kwargs)
@@ -192,17 +198,18 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
     elif type == "dependent":
 
         z = round((5 * de) / 100, 0)  # the 5% of the edges
-        measure_real = np.zeros((nrep, nrep))
-        measure_real_1 = None
-        measure_random = np.zeros((nrep, nrep))
-        measure_random_1 = None
-        mean_random = np.zeros(nrep)
-        mean_ = np.zeros(nrep)
-        mean_random_1 = None
-        mean_1 = None
+        measure_real = np.zeros((nrep ** 2, len(n_rewire)))
+        measure_real_1 = np.zeros((nrep ** 2, len(n_rewire)))
+        measure_random = np.zeros((nrep ** 2, len(n_rewire)))
+        measure_random_1 = np.zeros((nrep ** 2, len(n_rewire)))
+        mean_random = np.zeros((nrep, len(n_rewire)))
+        mean_random_1 = np.zeros((nrep, len(n_rewire)))
+        mean_ = np.zeros((nrep, len(n_rewire)))
+        mean_1 = np.zeros((nrep, len(n_rewire)))
+        vet1 = list(range(5, 105, 5))
+        vet = [round(x * de / 100) for x in vet1]
         diff = None
         diff_r = None
-        vet = [z] * (len(n_rewire) - 1)
 
         for z in vet:
             count2 = 0
@@ -212,9 +219,9 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
                 count2 += 1
                 k = 0
 
-                #? REAL
-                graph_rewire = rewire_onl(data=graph, number=z)
-                graph_rewire = ig.union(graph_rewire, diff)
+                # REAL
+                graph_rewire = rewire_onl(graph=graph, trials=z)
+                graph_rewire = ig.union([graph_rewire, diff]) if diff is not None else graph_rewire
                 comr = membership_communities(graph=graph_rewire,
                                               method=method, **kwargs)
                 Measure = ig.compare_communities(com_real, comr, method=measure)
@@ -232,8 +239,8 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
                 diff = ig.Graph.from_networkx(diff)
 
                 #? RANDOM
-                graph_rewire_random = rewire_onl(data=graph_random, number=z)
-                graph_rewire_random = ig.union(graph_rewire_random, diff_r)
+                graph_rewire_random = rewire_onl(graph=graph_random, trials=0)
+                graph_rewire_random = ig.union([graph_rewire_random, diff_r])  if diff_r is not None else graph_rewire_random
                 comr = membership_communities(graph=graph_rewire_random,
                                               method=method, **kwargs)
                 Measure = ig.compare_communities(com_random, comr, method=measure)
@@ -253,7 +260,7 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
                 for k in range(1, nrep):
                     count2 += 1
 
-                    # REAL
+                    #? REAL
                     real = rewire_compl(data=graph_rewire, number=round(0.01 * de),
                                         method=method,
                                         measure=measure,
@@ -266,8 +273,8 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
                         vector[k] = 1 - (real["Measure"])
                     measure_real_1[count2 - 1] = vector[k]
 
-                    # RANDOM
-                    random = rewire_compl(data=graph_rewire_random, number=round(0.01 * de),
+                    #? RANDOM
+                    random = rewire_compl(data=graph_rewire_random, number=0,
                                           method=method,
                                           measure=measure,
                                           community=com_random, **kwargs)
@@ -282,8 +289,8 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
                 mean_1[s] = np.mean(measure_real_1)
                 mean_random_1[s] = np.mean(measure_random_1)
             
-            graph = ig.intersection(graph, graph_rewire)
-            graph_random = ig.intersection(graph_random, graph_rewire_random)
+            graph = ig.intersection([graph, graph_rewire])
+            graph_random = ig.intersection([graph_random, graph_rewire_random])
             measure_random = np.column_stack((measure_random, measure_random_1))
             measure_real = np.column_stack((measure_real, measure_real_1))
             mean_ = np.column_stack((mean_, mean_1))
@@ -325,6 +332,10 @@ def plot_robin(graph, model1, model2, legend=("model1", "model2"), title="Robin 
     plt.legend()
     plt.show()
 
+graph = prep_graph(file="datasets/karate.gml", file_format="gml")
+graph_random = random(graph.copy())
+test_output = robin_robust(graph=graph, graph_random=graph_random, type="dependent")
+plot_robin(graph, test_output["Mean"], test_output["MeanRandom"], legend=("real data", "null model"))
 
 def robin_compare(graph, library="igraph", method1="louvain", method2="fastGreedy", measure="vi", type="independent", **kwargs):
     
