@@ -69,7 +69,7 @@ def rewire_compl(data, number, community, library="igraph", method="louvain", me
     measure = measure.lower()
 
     graph_data = data.to_networkx()
-    nx.double_edge_swap(graph_data, nswap=number, max_tries=1e75)
+    graph_data = nx.double_edge_swap(graph_data, nswap=number, max_tries=1e75)
     graph_data = ig.Graph.from_networkx(graph_data)
     data = graph_data
 
@@ -83,7 +83,7 @@ def rewire_compl(data, number, community, library="igraph", method="louvain", me
 
 def rewire_onl(graph, trials):
     graph_data = graph.to_networkx()
-    nx.double_edge_swap(graph_data, nswap=trials, max_tries=1e75)
+    graph_data = nx.double_edge_swap(graph_data, nswap=trials, max_tries=1e75)
     graph_data = ig.Graph.from_networkx(graph_data)
     graph = graph_data
     return graph
@@ -305,7 +305,7 @@ def robin_robust(graph, graph_random, library="igraph", method="louvain", measur
     return output
 
 
-def plot_robin(graph, model1, model2, legend=("model1", "model2"), title="Robin plot"):
+def plot_robin(graph, model1, model2, legend=("model1", "model2"), title="plot", save=False, path=None):
     mvimodel1 = model1.mean(axis=0)
     mvimodel2 = model2.mean(axis=0)
 
@@ -316,14 +316,20 @@ def plot_robin(graph, model1, model2, legend=("model1", "model2"), title="Robin 
     data_frame = {'percPert': perc_pert, 'mvi': mvi, 'model': model}
     
     for m, mvi_values in zip(legend, [mvimodel1, mvimodel2]):
-        plt.plot(perc_pert[0:21], mvi_values[0:], marker='o', label=m)
+        plt.plot(perc_pert[1:21], mvi_values[1:], marker='o', label=m)
 
-    plt.xlabel("Percentage of Perturbation")
-    plt.ylabel("Measure Cluster Comparison")
+    plt.xlabel("Randomization Percentage")
+    plt.ylabel("Cluster Comparison Metric")
     plt.ylim(0, 0.5)
     plt.title(title)
     plt.legend()
     plt.show()
+
+    if save:
+        if path is None:
+            raise ValueError("Invalid path")
+        else:
+            plt.savefig(path)
 
 
 def robin_compare(graph, library="igraph", method1="louvain", method2="fastGreedy", measure="vi", type="independent", **kwargs):
